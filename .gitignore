@@ -1,0 +1,22 @@
+# Build output
+target/
+out/
+dist/
+
+# Runtime data
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Generated reports and logs
+*.pdf
+*.log
+
+# IDE / local machine files
+.idea/
+*.iml
+
+# OS files
+Thumbs.db
+Desktop.ini
