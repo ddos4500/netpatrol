@@ -311,19 +311,24 @@ public class NetPatrolApp extends JFrame {
         group.add(sqliteRadio);
         group.add(mysqlRadio);
         JButton saveButton = new JButton("保存数据库配置");
+        JButton testButton = new JButton("测试MySQL连接");
         saveButton.addActionListener(e -> saveConfig());
+        testButton.addActionListener(e -> testMysqlConnection());
         JPanel form = grid();
         JPanel typePanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         typePanel.add(sqliteRadio);
         typePanel.add(mysqlRadio);
+        JPanel actionPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        actionPanel.add(saveButton);
+        actionPanel.add(testButton);
         form.add(new JLabel("存储后端")); form.add(typePanel);
         form.add(new JLabel("MySQL主机")); form.add(mysqlHostField);
         form.add(new JLabel("MySQL端口")); form.add(mysqlPortField);
         form.add(new JLabel("数据库名")); form.add(mysqlDatabaseField);
         form.add(new JLabel("用户名")); form.add(mysqlUserField);
         form.add(new JLabel("密码")); form.add(mysqlPasswordField);
-        form.add(new JLabel("操作")); form.add(saveButton);
-        JTextArea hint = new JTextArea("SQLite数据库位于主程序目录 data\\netpatrol.db。选择MySQL后，程序会把配置和历史JSON写入MySQL；如果连接失败，会自动回退到SQLite，避免程序无法启动。");
+        form.add(new JLabel("操作")); form.add(actionPanel);
+        JTextArea hint = new JTextArea("SQLite数据库位于主程序目录 data\\netpatrol.db。选择MySQL后，程序会把配置和巡检结果写入MySQL；如果连接失败，会自动回退到SQLite，避免程序无法启动。远程MySQL连接失败时，请先点击测试按钮查看具体错误。");
         hint.setEditable(false);
         JPanel panel = new JPanel(new BorderLayout());
         panel.add(form, BorderLayout.NORTH);
@@ -378,17 +383,34 @@ public class NetPatrolApp extends JFrame {
             mqtt.setTopic(mqttTopicField.getText().trim());
             mqtt.setHeartbeatTopic(mqttHeartbeatTopicField.getText().trim());
             DatabaseConfig db = config.getDatabaseConfig();
-            db.setBackend(mysqlRadio.isSelected() ? "MYSQL" : "SQLITE");
-            db.setHost(mysqlHostField.getText().trim());
-            db.setPort(parseInt(mysqlPortField.getText(), 3306));
-            db.setDatabase(mysqlDatabaseField.getText().trim());
-            db.setUsername(mysqlUserField.getText().trim());
-            db.setPassword(new String(mysqlPasswordField.getPassword()));
+            fillDatabaseConfigFromUi(db);
             configStore.save(config);
             statusLabel.setText("配置已保存到：" + configStore.getStorageDescription());
         } catch (Exception ex) {
             showError("保存配置失败", ex);
         }
+    }
+
+    private void testMysqlConnection() {
+        try {
+            DatabaseConfig db = new DatabaseConfig();
+            fillDatabaseConfigFromUi(db);
+            db.setBackend("MYSQL");
+            configStore.testConnection(db);
+            JOptionPane.showMessageDialog(this, "MySQL连接成功。", "测试MySQL连接", JOptionPane.INFORMATION_MESSAGE);
+            statusLabel.setText("MySQL连接测试成功：" + db.getHost() + ":" + db.getPort() + "/" + db.getDatabase());
+        } catch (Exception ex) {
+            showError("MySQL连接测试失败", ex);
+        }
+    }
+
+    private void fillDatabaseConfigFromUi(DatabaseConfig db) {
+        db.setBackend(mysqlRadio.isSelected() ? "MYSQL" : "SQLITE");
+        db.setHost(mysqlHostField.getText().trim());
+        db.setPort(parseInt(mysqlPortField.getText(), 3306));
+        db.setDatabase(mysqlDatabaseField.getText().trim());
+        db.setUsername(mysqlUserField.getText().trim());
+        db.setPassword(new String(mysqlPasswordField.getPassword()));
     }
 
     private void syncDevicesToConfig() {

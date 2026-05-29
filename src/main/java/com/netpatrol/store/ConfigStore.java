@@ -19,6 +19,7 @@ public class ConfigStore {
     private DatabaseConfig databaseConfig;
     private boolean mysqlActive;
     private String activeStorageDescription;
+    private String lastStorageError;
 
     public ConfigStore() {
         this.appDir = detectAppDir();
@@ -79,17 +80,40 @@ public class ConfigStore {
         return activeStorageDescription == null ? dbFile.getAbsolutePath() : activeStorageDescription;
     }
 
+    public String getLastStorageError() {
+        return lastStorageError == null ? "" : lastStorageError;
+    }
+
+    public void testConnection(DatabaseConfig cfg) throws SQLException {
+        DatabaseConfig copy = copyDatabaseConfig(cfg);
+        try (Connection c = copy.isMysql() ? connectMysql(copy) : DriverManager.getConnection("jdbc:sqlite:" + dbFile.getAbsolutePath());
+             Statement s = c.createStatement()) {
+            if (copy.isMysql()) {
+                s.executeQuery("select 1").close();
+            }
+        }
+    }
+
     private Connection connect() throws SQLException {
         if (mysqlActive) {
-            String url = "jdbc:mysql://" + value(databaseConfig.getHost()) + ":" + databaseConfig.getPort() + "/" + value(databaseConfig.getDatabase())
-                    + "?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true";
-            return DriverManager.getConnection(url, value(databaseConfig.getUsername()), value(databaseConfig.getPassword()));
+            return connectMysql(databaseConfig);
         }
         return DriverManager.getConnection("jdbc:sqlite:" + dbFile.getAbsolutePath());
     }
 
+    private Connection connectMysql(DatabaseConfig cfg) throws SQLException {
+        String host = value(cfg.getHost()).trim();
+        String database = value(cfg.getDatabase()).trim();
+        String url = "jdbc:mysql://" + host + ":" + cfg.getPort() + "/" + database
+                + "?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai"
+                + "&useSSL=false&allowPublicKeyRetrieval=true"
+                + "&connectTimeout=5000&socketTimeout=30000&tcpKeepAlive=true";
+        return DriverManager.getConnection(url, value(cfg.getUsername()).trim(), value(cfg.getPassword()));
+    }
+
     private void init() {
         mysqlActive = false;
+        lastStorageError = "";
         activeStorageDescription = "SQLite：" + dbFile.getAbsolutePath();
         if (databaseConfig != null && databaseConfig.isMysql()) {
             mysqlActive = true;
@@ -98,10 +122,11 @@ public class ConfigStore {
         try (Connection c = connect(); Statement s = c.createStatement()) {
             if (!mysqlActive) activeStorageDescription = "SQLite：" + dbFile.getAbsolutePath();
             createSchema(s, mysqlActive);
-        } catch (Exception ignored) {
+        } catch (Exception e) {
             if (databaseConfig != null && databaseConfig.isMysql()) {
                 mysqlActive = false;
-                activeStorageDescription = "SQLite：" + dbFile.getAbsolutePath() + "（MySQL连接失败，已回退）";
+                lastStorageError = e.getClass().getSimpleName() + ": " + value(e.getMessage());
+                activeStorageDescription = "SQLite：" + dbFile.getAbsolutePath() + "（MySQL连接失败，已回退：" + lastStorageError + "）";
                 try (Connection c = connect(); Statement s = c.createStatement()) {
                     createSchema(s, false);
                 } catch (Exception ignored2) {
