@@ -130,9 +130,15 @@ public class ConfigStore {
         s.execute("create table if not exists port_current_status (id " + id + ", switch_name text, switch_ip text, area text, port_key text, port_name text, port_descr text, if_index integer, speed_mbps integer, alert_speed_mbps integer, success integer, alert integer, message text, check_time text, updated_at text)");
         s.execute("create table if not exists snmp_oid_current_status (id " + id + ", name text, target_ip text, area text, oid text, value text, variable_type text, success integer, message text, check_time text, updated_at text)");
         s.execute("create table if not exists inspection_current_mqtt_messages (id " + id + ", message text, updated_at text)");
-        s.execute("create index if not exists idx_device_current_status_ip on device_current_status(ip)");
-        s.execute("create index if not exists idx_port_current_status_key on port_current_status(switch_ip, port_key)");
-        s.execute("create index if not exists idx_snmp_oid_current_status_key on snmp_oid_current_status(target_ip, oid)");
+        if (mysql) {
+            try { s.execute("create index idx_device_current_status_ip on device_current_status(ip(64))"); } catch (Exception ignored) {}
+            try { s.execute("create index idx_port_current_status_key on port_current_status(switch_ip(64), port_key(128))"); } catch (Exception ignored) {}
+            try { s.execute("create index idx_snmp_oid_current_status_key on snmp_oid_current_status(target_ip(64), oid(255))"); } catch (Exception ignored) {}
+        } else {
+            s.execute("create index if not exists idx_device_current_status_ip on device_current_status(ip)");
+            s.execute("create index if not exists idx_port_current_status_key on port_current_status(switch_ip, port_key)");
+            s.execute("create index if not exists idx_snmp_oid_current_status_key on snmp_oid_current_status(target_ip, oid)");
+        }
         try { s.execute("alter table scheduled_tasks add column include_snmp_oid_check integer default 0"); } catch (Exception ignored) {}
         try { s.execute("alter table mqtt_topic_rules add column enabled integer default 1"); } catch (Exception ignored) {}
     }
