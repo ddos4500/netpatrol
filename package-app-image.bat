@@ -5,6 +5,8 @@ set "MAIN_CLASS=com.netpatrol.app.NetPatrolApp"
 set "DIST_DIR=dist"
 set "JAR_OUT_DIR=%DIST_DIR%\jar"
 set "IMAGE_OUT_DIR=%DIST_DIR%\app-image"
+set "APP_DATA_DIR=%IMAGE_OUT_DIR%\%APP_NAME%\data"
+set "APP_DATA_BACKUP=%TEMP%\NetPatrol-data-backup-%RANDOM%"
 set "TOOL_JPACKAGE=jpackage"
 set "MAVEN_CMD=mvn"
 
@@ -19,6 +21,11 @@ if not exist "%TOOL_JPACKAGE%" (
     echo jpackage was not found. Install a full JDK 17 or JDK 21 and set JAVA_HOME.
     exit /b 1
   )
+)
+
+if exist "%APP_DATA_DIR%" (
+  mkdir "%APP_DATA_BACKUP%" >nul 2>nul
+  xcopy "%APP_DATA_DIR%" "%APP_DATA_BACKUP%\" /E /I /Y >nul
 )
 
 if exist "%DIST_DIR%" rmdir /s /q "%DIST_DIR%"
@@ -40,6 +47,12 @@ copy /y target\netpatrol-1.2.0.jar "%JAR_OUT_DIR%\netpatrol.jar" >nul
   --vendor "NetPatrol"
 
 if errorlevel 1 exit /b 1
+
+if exist "%APP_DATA_BACKUP%" (
+  mkdir "%APP_DATA_DIR%" >nul 2>nul
+  xcopy "%APP_DATA_BACKUP%" "%APP_DATA_DIR%\" /E /I /Y >nul
+  rmdir /s /q "%APP_DATA_BACKUP%"
+)
 
 echo Package complete:
 echo %CD%\%IMAGE_OUT_DIR%\%APP_NAME%\%APP_NAME%.exe
